@@ -141,7 +141,9 @@ class GeneralLedgerReport(models.AbstractModel):
         for initial_balance in initial_balances:
             pl_initial_balance["debit"] += initial_balance["debit"]
             pl_initial_balance["credit"] += initial_balance["credit"]
-            pl_initial_balance["balance"] += initial_balance["balance"]
+            pl_initial_balance["balance"] += (
+                initial_balance["debit"] - initial_balance["credit"]
+            )
             pl_initial_balance["bal_curr"] += initial_balance["amount_currency"]
         return pl_initial_balance
 
@@ -212,11 +214,11 @@ class GeneralLedgerReport(models.AbstractModel):
             gen_ld_data[acc_id]["init_bal"] = {}
             gen_ld_data[acc_id]["init_bal"]["credit"] = gl["credit"]
             gen_ld_data[acc_id]["init_bal"]["debit"] = gl["debit"]
-            gen_ld_data[acc_id]["init_bal"]["balance"] = gl["balance"]
+            gen_ld_data[acc_id]["init_bal"]["balance"] = gl["debit"] - gl["credit"]
             gen_ld_data[acc_id]["fin_bal"] = {}
             gen_ld_data[acc_id]["fin_bal"]["credit"] = gl["credit"]
             gen_ld_data[acc_id]["fin_bal"]["debit"] = gl["debit"]
-            gen_ld_data[acc_id]["fin_bal"]["balance"] = gl["balance"]
+            gen_ld_data[acc_id]["fin_bal"]["balance"] = gl["debit"] - gl["credit"]
             gen_ld_data[acc_id]["init_bal"]["bal_curr"] = gl["amount_currency"]
             gen_ld_data[acc_id]["fin_bal"]["bal_curr"] = gl["amount_currency"]
         partners_data = {}
@@ -240,11 +242,15 @@ class GeneralLedgerReport(models.AbstractModel):
                 gen_ld_data[acc_id][prt_id]["init_bal"] = {}
                 gen_ld_data[acc_id][prt_id]["init_bal"]["credit"] = gl["credit"]
                 gen_ld_data[acc_id][prt_id]["init_bal"]["debit"] = gl["debit"]
-                gen_ld_data[acc_id][prt_id]["init_bal"]["balance"] = gl["balance"]
+                gen_ld_data[acc_id][prt_id]["init_bal"]["balance"] = (
+                    gl["debit"] - gl["credit"]
+                )
                 gen_ld_data[acc_id][prt_id]["fin_bal"] = {}
                 gen_ld_data[acc_id][prt_id]["fin_bal"]["credit"] = gl["credit"]
                 gen_ld_data[acc_id][prt_id]["fin_bal"]["debit"] = gl["debit"]
-                gen_ld_data[acc_id][prt_id]["fin_bal"]["balance"] = gl["balance"]
+                gen_ld_data[acc_id][prt_id]["fin_bal"]["balance"] = (
+                    gl["debit"] - gl["credit"]
+                )
                 gen_ld_data[acc_id][prt_id]["init_bal"]["bal_curr"] = gl[
                     "amount_currency"
                 ]
@@ -260,24 +266,20 @@ class GeneralLedgerReport(models.AbstractModel):
             pl_initial_balance = self._get_pl_initial_balance(
                 account_ids, company_id, fy_start_date, foreign_currency, base_domain
             )
+            balance = pl_initial_balance["debit"] - pl_initial_balance["credit"]
             gen_ld_data[unaffected_id]["init_bal"]["debit"] += pl_initial_balance[
-                "debit"
-            ]
+                "debit"]
             gen_ld_data[unaffected_id]["init_bal"]["credit"] += pl_initial_balance[
                 "credit"
             ]
-            gen_ld_data[unaffected_id]["init_bal"]["balance"] += pl_initial_balance[
-                "balance"
-            ]
+            gen_ld_data[unaffected_id]["init_bal"]["balance"] += balance
             gen_ld_data[unaffected_id]["fin_bal"]["debit"] += pl_initial_balance[
                 "debit"
             ]
             gen_ld_data[unaffected_id]["fin_bal"]["credit"] += pl_initial_balance[
                 "credit"
             ]
-            gen_ld_data[unaffected_id]["fin_bal"]["balance"] += pl_initial_balance[
-                "balance"
-            ]
+            gen_ld_data[unaffected_id]["fin_bal"]["balance"] += balance
             if foreign_currency:
                 gen_ld_data[unaffected_id]["init_bal"][
                     "bal_curr"
@@ -307,7 +309,7 @@ class GeneralLedgerReport(models.AbstractModel):
             "tax_ids": move_line["tax_ids"],
             "debit": move_line["debit"],
             "credit": move_line["credit"],
-            "balance": move_line["balance"],
+            "balance": move_line["debit"] - move_line["credit"],
             "bal_curr": move_line["amount_currency"],
             "rec_id": move_line["full_reconcile_id"][0]
             if move_line["full_reconcile_id"]
@@ -517,9 +519,9 @@ class GeneralLedgerReport(models.AbstractModel):
                 gen_ld_data[acc_id][prt_id][ml_id] = self._get_move_line_data(move_line)
                 gen_ld_data[acc_id][prt_id]["fin_bal"]["credit"] += move_line["credit"]
                 gen_ld_data[acc_id][prt_id]["fin_bal"]["debit"] += move_line["debit"]
-                gen_ld_data[acc_id][prt_id]["fin_bal"]["balance"] += move_line[
-                    "balance"
-                ]
+                gen_ld_data[acc_id][prt_id]["fin_bal"]["balance"] += (
+                    move_line["debit"] - move_line["credit"]
+                )
                 if foreign_currency:
                     gen_ld_data[acc_id][prt_id]["fin_bal"]["bal_curr"] += move_line[
                         "amount_currency"
@@ -528,7 +530,9 @@ class GeneralLedgerReport(models.AbstractModel):
                 gen_ld_data[acc_id][ml_id] = self._get_move_line_data(move_line)
             gen_ld_data[acc_id]["fin_bal"]["credit"] += move_line["credit"]
             gen_ld_data[acc_id]["fin_bal"]["debit"] += move_line["debit"]
-            gen_ld_data[acc_id]["fin_bal"]["balance"] += move_line["balance"]
+            gen_ld_data[acc_id]["fin_bal"]["balance"] += (
+                move_line["debit"] - move_line["credit"]
+            )
             if foreign_currency:
                 gen_ld_data[acc_id]["fin_bal"]["bal_curr"] += move_line[
                     "amount_currency"
