@@ -168,13 +168,13 @@ class TrialBalanceReport(models.AbstractModel):
         )
         initial_balances = self.env["account.move.line"].read_group(
             domain=domain,
-            fields=["account_id", "balance", "amount_currency"],
+            fields=["account_id", "debit", "credit", "balance", "amount_currency"],
             groupby=["account_id"],
         )
         pl_initial_balance = 0.0
         pl_initial_currency_balance = 0.0
         for initial_balance in initial_balances:
-            pl_initial_balance += initial_balance["balance"]
+            pl_initial_balance += initial_balance["debit"] - initial_balance["credit"]
             if foreign_currency:
                 pl_initial_currency_balance += round(
                     initial_balance["amount_currency"], 2
@@ -190,15 +190,15 @@ class TrialBalanceReport(models.AbstractModel):
             total_amount[acc_id] = self._prepare_total_amount(tb, foreign_currency)
             total_amount[acc_id]["credit"] = tb["credit"]
             total_amount[acc_id]["debit"] = tb["debit"]
-            total_amount[acc_id]["balance"] = tb["balance"]
+            total_amount[acc_id]["balance"] = tb["debit"] - tb["credit"]
             total_amount[acc_id]["initial_balance"] = 0.0
         for tb in tb_initial_acc:
             acc_id = tb["account_id"]
             if acc_id not in total_amount.keys():
                 total_amount[acc_id] = self._prepare_total_amount(tb, foreign_currency)
             else:
-                total_amount[acc_id]["initial_balance"] = tb["balance"]
-                total_amount[acc_id]["ending_balance"] += tb["balance"]
+                total_amount[acc_id]["initial_balance"] = tb["debit"] - tb["credit"]
+                total_amount[acc_id]["ending_balance"] += tb["debit"] - tb["credit"]
                 if foreign_currency:
                     total_amount[acc_id]["initial_currency_balance"] = round(
                         tb["amount_currency"], 2
@@ -214,8 +214,8 @@ class TrialBalanceReport(models.AbstractModel):
             "credit": 0.0,
             "debit": 0.0,
             "balance": 0.0,
-            "initial_balance": tb["balance"],
-            "ending_balance": tb["balance"],
+            "initial_balance": tb["debit"] - tb["credit"],
+            "ending_balance": tb["debit"] - tb["credit"],
         }
         if foreign_currency:
             res["initial_currency_balance"] = round(tb["amount_currency"], 2)
@@ -235,8 +235,8 @@ class TrialBalanceReport(models.AbstractModel):
             )
         else:
             # Increase balance field values
-            total_amount[acc_id][prt_id]["initial_balance"] = tb["balance"]
-            total_amount[acc_id][prt_id]["ending_balance"] += tb["balance"]
+            total_amount[acc_id][prt_id]["initial_balance"] = tb["debit"] - tb["credit"]
+            total_amount[acc_id][prt_id]["ending_balance"] += tb["debit"] - tb["credit"]
             if foreign_currency:
                 total_amount[acc_id][prt_id]["initial_currency_balance"] = round(
                     tb["amount_currency"], 2
@@ -265,7 +265,7 @@ class TrialBalanceReport(models.AbstractModel):
             )
             total_amount[acc_id][prt_id]["credit"] = tb["credit"]
             total_amount[acc_id][prt_id]["debit"] = tb["debit"]
-            total_amount[acc_id][prt_id]["balance"] = tb["balance"]
+            total_amount[acc_id][prt_id]["balance"] = tb["debit"] - tb["credit"]
             total_amount[acc_id][prt_id]["initial_balance"] = 0.0
             partners_ids.add(prt_id)
         for tb in tb_initial_prt:
@@ -307,7 +307,13 @@ class TrialBalanceReport(models.AbstractModel):
         tb_initial_acc = []
         for account in accounts:
             tb_initial_acc.append(
-                {"account_id": account.id, "balance": 0.0, "amount_currency": 0.0}
+                {
+                    "account_id": account.id,
+                    "credit": 0.0,
+                    "debit": 0.0,
+                    "balance": 0.0,
+                    "amount_currency": 0.0,
+                }
             )
         initial_domain_bs = self._get_initial_balances_bs_ml_domain(
             account_ids,
@@ -320,7 +326,7 @@ class TrialBalanceReport(models.AbstractModel):
         )
         tb_initial_acc_bs = self.env["account.move.line"].read_group(
             domain=initial_domain_bs,
-            fields=["account_id", "balance", "amount_currency"],
+            fields=["account_id", "credit", "debit", "balance", "amount_currency"],
             groupby=["account_id"],
         )
         initial_domain_pl = self._get_initial_balances_pl_ml_domain(
@@ -335,7 +341,7 @@ class TrialBalanceReport(models.AbstractModel):
         )
         tb_initial_acc_pl = self.env["account.move.line"].read_group(
             domain=initial_domain_pl,
-            fields=["account_id", "balance", "amount_currency"],
+            fields=["account_id", "credit", "debit", "balance", "amount_currency"],
             groupby=["account_id"],
         )
         tb_initial_acc_rg = tb_initial_acc_bs + tb_initial_acc_pl
@@ -348,7 +354,9 @@ class TrialBalanceReport(models.AbstractModel):
                 )
             )
             if element:
-                element[0]["balance"] += account_rg["balance"]
+                element[0]["debit"] += account_rg["debit"]
+                element[0]["credit"] += account_rg["credit"]
+                element[0]["balance"] += account_rg["debit"] - account_rg["credit"]
                 element[0]["amount_currency"] += account_rg["amount_currency"]
         if hide_account_at_0:
             tb_initial_acc = [p for p in tb_initial_acc if p["balance"] != 0]
@@ -372,13 +380,27 @@ class TrialBalanceReport(models.AbstractModel):
         if show_partner_details:
             tb_initial_prt_bs = self.env["account.move.line"].read_group(
                 domain=initial_domain_bs,
-                fields=["account_id", "partner_id", "balance", "amount_currency"],
+                fields=[
+                    "account_id",
+                    "partner_id",
+                    "debit",
+                    "credit",
+                    "balance",
+                    "amount_currency",
+                ],
                 groupby=["account_id", "partner_id"],
                 lazy=False,
             )
             tb_initial_prt_pl = self.env["account.move.line"].read_group(
                 domain=initial_domain_pl,
-                fields=["account_id", "partner_id", "balance", "amount_currency"],
+                fields=[
+                    "account_id",
+                    "partner_id",
+                    "debit",
+                    "credit",
+                    "balance",
+                    "amount_currency",
+                ],
                 groupby=["account_id", "partner_id"],
             )
             tb_initial_prt = tb_initial_prt_bs + tb_initial_prt_pl
@@ -460,7 +482,9 @@ class TrialBalanceReport(models.AbstractModel):
                     ]
                     groups_data[nw_id]["debit"] += groups_data[group_id]["debit"]
                     groups_data[nw_id]["credit"] += groups_data[group_id]["credit"]
-                    groups_data[nw_id]["balance"] += groups_data[group_id]["balance"]
+                    groups_data[nw_id]["balance"] += (
+                        groups_data[group_id]["debit"] - groups_data[group_id]["credit"]
+                    )
                     groups_data[nw_id]["ending_balance"] += groups_data[group_id][
                         "ending_balance"
                     ]
@@ -478,7 +502,9 @@ class TrialBalanceReport(models.AbstractModel):
                     ]
                     groups_data[nw_id]["debit"] = groups_data[group_id]["debit"]
                     groups_data[nw_id]["credit"] = groups_data[group_id]["credit"]
-                    groups_data[nw_id]["balance"] = groups_data[group_id]["balance"]
+                    groups_data[nw_id]["balance"] = (
+                        groups_data[group_id]["debit"] - groups_data[group_id]["credit"]
+                    )
                     groups_data[nw_id]["ending_balance"] = groups_data[group_id][
                         "ending_balance"
                     ]
@@ -559,7 +585,10 @@ class TrialBalanceReport(models.AbstractModel):
                 ]
                 groups_data[group_id]["debit"] += total_amount[account_id]["debit"]
                 groups_data[group_id]["credit"] += total_amount[account_id]["credit"]
-                groups_data[group_id]["balance"] += total_amount[account_id]["balance"]
+                groups_data[group_id]["balance"] += (
+                    total_amount[account_id]["debit"]
+                    - total_amount[account_id]["credit"]
+                )
                 groups_data[group_id]["ending_balance"] += total_amount[account_id][
                     "ending_balance"
                 ]
@@ -732,7 +761,8 @@ class TrialBalanceReport(models.AbstractModel):
                         "initial_balance": total_amount[account_id]["initial_balance"],
                         "credit": total_amount[account_id]["credit"],
                         "debit": total_amount[account_id]["debit"],
-                        "balance": total_amount[account_id]["balance"],
+                        "balance": total_amount[account_id]["debit"]
+                        - total_amount[account_id]["credit"],
                         "ending_balance": total_amount[account_id]["ending_balance"],
                         "type": "account_type",
                     }

@@ -146,7 +146,9 @@ class GeneralLedgerReport(models.AbstractModel):
         for initial_balance in initial_balances:
             pl_initial_balance["debit"] += initial_balance["debit"]
             pl_initial_balance["credit"] += initial_balance["credit"]
-            pl_initial_balance["balance"] += initial_balance["balance"]
+            pl_initial_balance["balance"] += (
+                initial_balance["debit"] - initial_balance["credit"]
+            )
             pl_initial_balance["bal_curr"] += initial_balance["amount_currency"]
         return pl_initial_balance
 
@@ -167,7 +169,10 @@ class GeneralLedgerReport(models.AbstractModel):
             res[key_bal] = {}
             for key_field in ["credit", "debit", "balance", "bal_curr"]:
                 field_name = key_field if key_field != "bal_curr" else "amount_currency"
-                res[key_bal][key_field] = gl[field_name]
+                if key_field == "balance":
+                    res[key_bal][key_field] = gl["debit"] - gl["credit"]
+                else:
+                    res[key_bal][key_field] = gl[field_name]
         return res
 
     def _prepare_gen_ld_data(self, gl_initial_acc, domain, grouped_by):
@@ -296,14 +301,18 @@ class GeneralLedgerReport(models.AbstractModel):
             pl_initial_balance = self._get_pl_initial_balance(
                 account_ids, company_id, fy_start_date, foreign_currency, base_domain
             )
+            balance = pl_initial_balance["debit"] - pl_initial_balance["credit"]
             for key_bal in ["init_bal", "fin_bal"]:
                 fields_balance = ["credit", "debit", "balance"]
                 if foreign_currency:
                     fields_balance.append("bal_curr")
                 for field_name in fields_balance:
-                    data[unaffected_id][key_bal][field_name] += pl_initial_balance[
-                        field_name
-                    ]
+                    if field_name == "balance":
+                        data[unaffected_id][key_bal][field_name] += balance
+                    else:
+                        data[unaffected_id][key_bal][field_name] += pl_initial_balance[
+                            field_name
+                        ]
         return data
 
     @api.model
@@ -327,7 +336,7 @@ class GeneralLedgerReport(models.AbstractModel):
             "tax_line_id": move_line["tax_line_id"],
             "debit": move_line["debit"],
             "credit": move_line["credit"],
-            "balance": move_line["balance"],
+            "balance": move_line["debit"] - move_line["credit"],
             "bal_curr": move_line["amount_currency"],
             "rec_id": move_line["full_reconcile_id"][0]
             if move_line["full_reconcile_id"]
@@ -524,9 +533,9 @@ class GeneralLedgerReport(models.AbstractModel):
                     gen_ld_data[acc_id][item_id]["fin_bal"]["debit"] += move_line[
                         "debit"
                     ]
-                    gen_ld_data[acc_id][item_id]["fin_bal"]["balance"] += move_line[
-                        "balance"
-                    ]
+                    gen_ld_data[acc_id][item_id]["fin_bal"]["balance"] += (
+                        move_line["debit"] - move_line["credit"]
+                    )
                     if foreign_currency:
                         gen_ld_data[acc_id][item_id]["fin_bal"][
                             "bal_curr"
@@ -535,7 +544,9 @@ class GeneralLedgerReport(models.AbstractModel):
                 gen_ld_data[acc_id][ml_id] = self._get_move_line_data(move_line)
             gen_ld_data[acc_id]["fin_bal"]["credit"] += move_line["credit"]
             gen_ld_data[acc_id]["fin_bal"]["debit"] += move_line["debit"]
-            gen_ld_data[acc_id]["fin_bal"]["balance"] += move_line["balance"]
+            gen_ld_data[acc_id]["fin_bal"]["balance"] += (
+                move_line["debit"] - move_line["credit"]
+            )
             if foreign_currency:
                 gen_ld_data[acc_id]["fin_bal"]["bal_curr"] += move_line[
                     "amount_currency"
