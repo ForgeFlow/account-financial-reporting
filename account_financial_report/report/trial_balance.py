@@ -204,8 +204,8 @@ class TrialBalanceReport(models.AbstractModel):
                 total_amount[acc_id]["credit"] = 0.0
                 total_amount[acc_id]["debit"] = 0.0
                 total_amount[acc_id]["balance"] = 0.0
-                total_amount[acc_id]["initial_balance"] = tb["debit"] - tb["credit"]
-                total_amount[acc_id]["ending_balance"] = tb["debit"] - tb["credit"]
+                total_amount[acc_id]["initial_balance"] = tb["balance"]
+                total_amount[acc_id]["ending_balance"] = tb["balance"]
                 if foreign_currency:
                     total_amount[acc_id]["initial_currency_balance"] = round(
                         tb["amount_currency"], 2
@@ -214,8 +214,8 @@ class TrialBalanceReport(models.AbstractModel):
                         tb["amount_currency"], 2
                     )
             else:
-                total_amount[acc_id]["initial_balance"] = tb["debit"] - tb["credit"]
-                total_amount[acc_id]["ending_balance"] += tb["debit"] - tb["credit"]
+                total_amount[acc_id]["initial_balance"] = tb["balance"]
+                total_amount[acc_id]["ending_balance"] += tb["balance"]
                 if foreign_currency:
                     total_amount[acc_id]["initial_currency_balance"] = round(
                         tb["amount_currency"], 2
