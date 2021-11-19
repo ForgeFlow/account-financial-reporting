@@ -60,7 +60,10 @@ class TrialBalanceReport(models.TransientModel):
         comodel_name='report_trial_balance_qweb_account',
         inverse_name='report_id'
     )
-
+    # todo implement
+    operating_unit_ids = fields.Many2many(comodel_name='operating.unit')
+    analytic_account_ids = fields.Many2many(
+        comodel_name='account.analytic.account')
 
 class TrialBalanceReportAccount(models.TransientModel):
 

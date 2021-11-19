@@ -13,7 +13,12 @@
 
     <template id="report_open_items_base">
         <!-- Defines global variables used by internal layout -->
-        <t t-set="title" >Open Items - <t t-raw="o.company_id.name"/> - <t t-raw="o.company_id.currency_id.name"/></t>
+        <t t-if="o.operating_unit_ids">
+            <t t-set="title" >Open Items - <t t-raw="o.operating_unit_names"/> - <t t-raw="o.company_id.currency_id.name"/></t>
+        </t>
+        <t t-if="not o.operating_unit_ids">
+            <t t-set="title" >Open Items - <t t-raw="o.company_id.name"/> - <t t-raw="o.company_id.currency_id.name"/></t>
+        </t>
         <t t-set="company_name" t-value="o.company_id.name"/>
         <t t-set="res_company" t-value="o.company_id"/>
         <t t-set="foreign_currency" t-value="o.foreign_currency"/>
@@ -99,6 +104,8 @@
                     <div class="act_as_cell" style="width: 4.78%;">Journal</div>
                     <!--## account code-->
                     <div class="act_as_cell" style="width: 5.38%;">Account</div>
+                    <!--## analytic account code-->
+                    <div class="act_as_cell" style="width: 5.38%;">Analytic Account</div>
                     <!--## partner-->
                     <div class="act_as_cell" style="width: 14.57%;">Partner
                     </div>
@@ -146,6 +153,8 @@
                     <div class="act_as_cell left"><span t-field="line.journal"/></div>
                     <!--## account code-->
                     <div class="act_as_cell left"><span t-field="line.account"/></div>
+                    <!--## analytic code-->
+                    <div class="act_as_cell left"><span t-field="line.complete_wbs_code"/></div>
                     <!--## partner-->
                     <div class="act_as_cell left">
                         <t t-set="res_model" t-value="'res.partner'"/>

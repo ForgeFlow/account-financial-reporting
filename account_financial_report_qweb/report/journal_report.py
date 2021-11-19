@@ -64,6 +64,10 @@ class ReportJournalQweb(models.TransientModel):
     )
     foreign_currency = fields.Boolean()
     with_account_name = fields.Boolean()
+    # todo implement
+    operating_unit_ids = fields.Many2many(comodel_name='operating.unit')
+    analytic_account_ids = fields.Many2many(
+        comodel_name='account.analytic.account')
 
     @api.model
     def _get_move_targets(self):
@@ -281,7 +285,9 @@ class ReportJournalQweb(models.TransientModel):
                 currency_name,
                 tax_id,
                 taxes_description,
-                company_id
+                company_id,
+                operating_unit_id,
+                analytic_account_id
             )
             SELECT
                 %s as create_uid,
@@ -327,7 +333,9 @@ class ReportJournalQweb(models.TransientModel):
                 ELSE
                     ''
                 END as taxes_description,
-                aml.company_id as company_id
+                aml.company_id as company_id,
+                aml.operating_unit_id as operating_unit_id,
+                aml.analytic_account_id as analytic_account_id
             FROM
                 account_move_line aml
             INNER JOIN
@@ -661,7 +669,10 @@ class ReportJournalQwebJournal(models.TransientModel):
     currency_id = fields.Many2one(
         comodel_name='res.currency',
     )
-
+# todo implement
+    operating_unit_ids = fields.Many2many(comodel_name='operating.unit')
+    analytic_account_ids = fields.Many2many(
+        comodel_name='account.analytic.account')
 
 class ReportJournalQwebMove(models.TransientModel):
 

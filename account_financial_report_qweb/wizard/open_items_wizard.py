@@ -39,13 +39,18 @@ class OpenItemsReportWizard(models.TransientModel):
              'If partners are filtered, '
              'debits and credits totals will not match the trial balance.'
     )
-    receivable_accounts_only = fields.Boolean()
-    payable_accounts_only = fields.Boolean()
+    receivable_accounts_only = fields.Boolean(default=True)
+    payable_accounts_only = fields.Boolean(default=True)
     partner_ids = fields.Many2many(
         comodel_name='res.partner',
         string='Filter partners',
         default=lambda self: self._default_partners(),
     )
+    operating_unit_ids = fields.Many2many(comodel_name='operating.unit')
+    analytic_account_ids = fields.Many2many(
+        comodel_name='account.analytic.account')
+    analytic_only = fields.Boolean(string="Only Analytic Items")
+
     foreign_currency = fields.Boolean(
         string='Show foreign currency',
         default=lambda self: self._default_foreign_currency(),
@@ -53,6 +58,13 @@ class OpenItemsReportWizard(models.TransientModel):
              'account currency is not setup through chart of accounts '
              'will display initial and final balance in that currency.'
     )
+
+    @api.onchange('analytic_only')
+    def clear_analytic(self):
+        if self.analytic_only:
+            self.analytic_account_ids = self.env['account.analytic.account'].search([('stage_id.name', 'not ilike', 'Closed')])
+        else:
+            self.analytic_account_ids = False
 
     @api.onchange('company_id')
     def onchange_company_id(self):
@@ -151,6 +163,8 @@ class OpenItemsReportWizard(models.TransientModel):
             'hide_account_at_0': self.hide_account_at_0,
             'foreign_currency': self.foreign_currency,
             'company_id': self.company_id.id,
+            'operating_unit_ids': [(6, 0, self.operating_unit_ids.ids)],
+            'analytic_account_ids': [(6, 0, self.analytic_account_ids.ids)],
             'filter_account_ids': [(6, 0, self.account_ids.ids)],
             'filter_partner_ids': [(6, 0, self.partner_ids.ids)],
         }

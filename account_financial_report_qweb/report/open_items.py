@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # © 2016 Julien Coux (Camptocamp)
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+from datetime import timedelta
 
 from odoo import models, fields, api, _
 
@@ -27,12 +28,20 @@ class OpenItemsReport(models.TransientModel):
     company_id = fields.Many2one(comodel_name='res.company')
     filter_account_ids = fields.Many2many(comodel_name='account.account')
     filter_partner_ids = fields.Many2many(comodel_name='res.partner')
+    operating_unit_ids = fields.Many2many(comodel_name='operating.unit', string="Operating Units")
+    analytic_account_ids = fields.Many2many(
+        comodel_name='account.analytic.account')
 
     # Data fields, used to browse report data
     account_ids = fields.One2many(
         comodel_name='report_open_items_qweb_account',
         inverse_name='report_id'
     )
+    operating_unit_names = fields.Char(compute='_compute_operating_unit_names')
+
+    @api.depends('operating_unit_ids')
+    def _compute_operating_unit_names(self):
+        self.operating_unit_names = ' - '.join(self.operating_unit_ids.mapped('name'))
 
 
 class OpenItemsReportAccount(models.TransientModel):
@@ -52,7 +61,6 @@ class OpenItemsReportAccount(models.TransientModel):
         'account.account',
         index=True
     )
-
     # Data fields, used for report display
     code = fields.Char()
     name = fields.Char()
@@ -124,6 +132,9 @@ class OpenItemsReportMoveLine(models.TransientModel):
         ondelete='cascade',
         index=True
     )
+    operating_unit_id = fields.Many2one(comodel_name='operating.unit')
+    analytic_account_id = fields.Many2one(
+        comodel_name='account.analytic.account')
 
     # Data fields, used to keep link with real object
     move_line_id = fields.Many2one('account.move.line')
@@ -134,6 +145,7 @@ class OpenItemsReportMoveLine(models.TransientModel):
     entry = fields.Char()
     journal = fields.Char()
     account = fields.Char()
+    complete_wbs_code = fields.Char()
     partner = fields.Char()
     label = fields.Char()
     amount_total_due = fields.Float(digits=(16, 2))
@@ -415,10 +427,6 @@ FROM
                 account_partial_reconcile pr
                     ON ml.balance < 0 AND pr.credit_move_id = ml.id
             LEFT JOIN
-                account_move_line ml_future
-                    ON ml.balance < 0 AND pr.debit_move_id = ml_future.id
-                    AND ml_future.date > %s
-            LEFT JOIN
                 account_move_line ml_past
                     ON ml.balance < 0 AND pr.debit_move_id = ml_past.id
                     AND ml_past.date <= %s
@@ -429,26 +437,19 @@ FROM
                 account_partial_reconcile pr
                     ON ml.balance > 0 AND pr.debit_move_id = ml.id
             LEFT JOIN
-                account_move_line ml_future
-                    ON ml.balance > 0 AND pr.credit_move_id = ml_future.id
-                    AND ml_future.date > %s
-            LEFT JOIN
                 account_move_line ml_past
                     ON ml.balance > 0 AND pr.credit_move_id = ml_past.id
                     AND ml_past.date <= %s
         """
         sub_query += """
+            LEFT JOIN account_full_reconcile afr ON afr.id = ml.full_reconcile_id
             WHERE
                 ra.report_id = %s
+            AND ml.full_reconcile_id IS NULL OR afr.create_date >= %s
             GROUP BY
                 ml.id,
                 ml.balance,
                 ml.amount_currency
-            HAVING
-                (
-                    ml.full_reconcile_id IS NULL
-                    OR MAX(ml_future.id) IS NOT NULL
-                )
         """
         return sub_query
 
@@ -525,9 +526,12 @@ INSERT INTO
     label,
     amount_total_due,
     amount_residual,
+    operating_unit_id,
+    analytic_account_id,
     currency_id,
     amount_total_due_currency,
-    amount_residual_currency
+    amount_residual_currency,
+    complete_wbs_code
     )
 SELECT
     rp.id AS report_partner_id,
@@ -558,9 +562,12 @@ SELECT
     CONCAT_WS(' - ', NULLIF(ml.ref, ''), NULLIF(ml.name, '')) AS label,
     ml.balance,
     ml2.amount_residual,
+    ml.operating_unit_id as operating_unit_id,
+    ml.analytic_account_id as analytic_account_id,
     c.id AS currency_id,
     ml.amount_currency,
-    ml2.amount_residual_currency
+    ml2.amount_residual_currency,
+    aa.complete_wbs_code
 FROM
     report_open_items_qweb_partner rp
 INNER JOIN
@@ -590,6 +597,8 @@ LEFT JOIN
     account_full_reconcile fr ON ml.full_reconcile_id = fr.id
 LEFT JOIN
     res_currency c ON ml2.currency_id = c.id
+LEFT JOIN
+    account_analytic_account aa ON ml.analytic_account_id = aa.id
 WHERE
     ra.report_id = %s
 AND
@@ -599,6 +608,16 @@ AND
             query_inject_move_line += """
 AND
     m.state = 'posted'
+        """
+        if self.operating_unit_ids:
+            query_inject_move_line += """
+    AND
+    ml.operating_unit_id in %s
+        """
+        if self.analytic_account_ids:
+            query_inject_move_line += """
+    AND
+    ml.analytic_account_id in %s
         """
         if only_empty_partner_line:
             query_inject_move_line += """
@@ -610,24 +629,74 @@ AND
         if not only_empty_partner_line:
             query_inject_move_line += """
 ORDER BY
-    a.code, p.name, ml.date, ml.id
+    a.code, p.name, ml.analytic_account_id, ml.date, ml.id
             """
         elif only_empty_partner_line:
             query_inject_move_line += """
 ORDER BY
-    a.code, ml.date, ml.id
+    a.code, ml.analytic_account_id, ml.date, ml.id
             """
-        self.env.cr.execute(
-            query_inject_move_line,
-            (self.date_at,
-             self.date_at,
-             self.id,
-             self.date_at,
-             self.date_at,
-             self.id,
-             self.env.uid,
-             self.id,
-             self.date_at,)
+        full_reconcile_date = fields.Datetime.to_string(
+            fields.Datetime.from_string(self.date_at) + timedelta(days=1))
+        if self.operating_unit_ids:
+            if self.analytic_account_ids:
+                self.env.cr.execute(
+                    query_inject_move_line,
+                    (self.date_at,
+                    self.id,
+                    full_reconcile_date,
+                    self.date_at,
+                    self.id,
+                    full_reconcile_date,
+                    self.env.uid,
+                    self.id,
+                    self.date_at,
+                    tuple(self.operating_unit_ids.ids),
+                    tuple(self.analytic_account_ids.ids),
+                    ))
+            else:
+                self.env.cr.execute(
+                    query_inject_move_line,
+                    (self.date_at,
+                    self.id,
+                    full_reconcile_date,
+                    self.date_at,
+                    self.id,
+                    full_reconcile_date,
+                    self.env.uid,
+                    self.id,
+                    self.date_at,
+                    tuple(self.operating_unit_ids.ids),
+                    ))
+
+        else:
+            if not self.analytic_account_ids:
+                self.env.cr.execute(
+                    query_inject_move_line,
+                    (self.date_at,
+                    self.id,
+                    full_reconcile_date,
+                    self.date_at,
+                    self.id,
+                    full_reconcile_date,
+                    self.env.uid,
+                    self.id,
+                    self.date_at
+                    ))
+            else:
+                self.env.cr.execute(
+                    query_inject_move_line,
+                    (self.date_at,
+                    self.id,
+                    full_reconcile_date,
+                    self.date_at,
+                    self.id,
+                    full_reconcile_date,
+                    self.env.uid,
+                    self.id,
+                    self.date_at,
+                    tuple(self.analytic_account_ids.ids),
+                    )
         )
 
     def _compute_partners_and_accounts_cumul(self):
