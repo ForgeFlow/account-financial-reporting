@@ -240,9 +240,19 @@ class AgedPartnerBalanceReportCompute(models.TransientModel):
             'filter_partner_ids': [(6, 0, self.filter_partner_ids.ids)],
         }
 
+    @api.model
+    def _delete_old_report_data(self):
+        self.env.cr.execute("""
+        DELETE FROM report_open_items_qweb_partner;
+        DELETE FROM report_open_items_qweb_move_line;
+        DELETE FROM report_open_items_qweb_account;
+        """)
+
     @api.multi
     def compute_data_for_report(self):
         self.ensure_one()
+        # Delete old data to prevent confusion
+        self._delete_old_report_data()
         # Compute Open Items Report Data.
         # The data of Aged Partner Balance Report
         # are based on Open Items Report data.
@@ -258,6 +268,19 @@ class AgedPartnerBalanceReportCompute(models.TransientModel):
         if self.show_move_line_details:
             self._inject_move_line_values()
             self._inject_move_line_values(only_empty_partner_line=True)
+        # delete unwanted entries so the following method will not count it
+        if self.operating_unit_ids:
+            query_delete = """
+            DELETE FROM report_open_items_qweb_move_line WHERE operating_unit_id NOT IN %s
+            """
+            query_delete_params = (tuple(self.operating_unit_ids.ids),)
+            self.env.cr.execute(query_delete, query_delete_params)
+        if self.analytic_account_ids:
+            query_delete = """
+            DELETE FROM report_open_items_qweb_move_line WHERE analytic_account_id NOT IN %s
+            """
+            query_delete_params = (tuple(self.analytic_account_ids.ids),)
+            self.env.cr.execute(query_delete, query_delete_params)
         self._compute_accounts_cumul()
         # Refresh cache because all data are computed with SQL requests
         self.invalidate_cache()
@@ -438,6 +461,16 @@ INNER JOIN
 WHERE
     rao.report_id = %s
 AND ra.report_id = %s
+"""
+        if self.operating_unit_ids:
+            query_inject_line += """
+        AND rlo.operating_unit_id IN %s
+            """
+        if self.analytic_account_ids:
+            query_inject_line += """
+        AND rlo.analytic_account_id IN %s
+            """
+        query_inject_line += """
 GROUP BY
     rp.id
         """
@@ -447,6 +480,10 @@ GROUP BY
             self.open_items_id.id,
             self.id,
         )
+        if self.operating_unit_ids:
+            query_inject_line_params += (tuple(self.operating_unit_ids.ids),)
+        if self.analytic_account_ids:
+            query_inject_line_params += (tuple(self.analytic_account_ids.ids),)
         self.env.cr.execute(query_inject_line, query_inject_line_params)
 
     def _inject_move_line_values(self, only_empty_partner_line=False):
@@ -567,12 +604,24 @@ WHERE
     rao.report_id = %s
 AND ra.report_id = %s
         """
+        if self.operating_unit_ids:
+            query_inject_move_line += """
+        AND rlo.operating_unit_id IN %s
+            """
+        if self.analytic_account_ids:
+            query_inject_move_line += """
+        AND rlo.analytic_account_id IN %s
+            """
         query_inject_move_line_params = (self.date_at,) * 5
         query_inject_move_line_params += (
             self.env.uid,
             self.open_items_id.id,
             self.id,
         )
+        if self.operating_unit_ids:
+            query_inject_move_line_params += (tuple(self.operating_unit_ids.ids),)
+        if self.analytic_account_ids:
+            query_inject_move_line_params += (tuple(self.analytic_account_ids.ids),)
         self.env.cr.execute(query_inject_move_line,
                             query_inject_move_line_params)
 

@@ -20,6 +20,7 @@
         'date_range',
         'report_xlsx',
         'report',
+        'account_operating_unit',
         'web_widget_many2many_tags_multi_selection',
     ],
     'data': [

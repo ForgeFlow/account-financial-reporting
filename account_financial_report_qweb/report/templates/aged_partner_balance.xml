@@ -65,20 +65,22 @@
 
                         <!-- Display account partners -->
                         <t t-foreach="account.partner_ids" t-as="partner">
-                            <div class="page_break">
-                                <!-- Display partner header -->
-                                <div class="act_as_caption account_title">
-                                    <span t-field="partner.name"/>
+                            <t t-if="len(partner.move_line_ids) > 0">
+                                <div class="page_break">
+                                    <!-- Display partner header -->
+                                    <div class="act_as_caption account_title">
+                                        <span t-field="partner.name"/>
+                                    </div>
+
+                                    <!-- Display partner move lines -->
+                                    <t t-call="account_financial_report_qweb.report_aged_partner_balance_move_lines"/>
+
+                                    <!-- Display partner footer -->
+                                    <t t-call="account_financial_report_qweb.report_aged_partner_balance_partner_ending_cumul">
+                                        <t t-set="partner_cumul_line" t-value="partner.line_ids"/>
+                                    </t>
                                 </div>
-
-                                <!-- Display partner move lines -->
-                                <t t-call="account_financial_report_qweb.report_aged_partner_balance_move_lines"/>
-
-                                <!-- Display partner footer -->
-                                <t t-call="account_financial_report_qweb.report_aged_partner_balance_partner_ending_cumul">
-                                    <t t-set="partner_cumul_line" t-value="partner.line_ids"/>
-                                </t>
-                            </div>
+                            </t>
                         </t>
 
                         <!-- Display account footer -->
