@@ -65,6 +65,8 @@ class VATReport(models.AbstractModel):
         ml_fields = [
             "id",
             "tax_base_amount",
+            "credit",
+            "debit",
             "balance",
             "tax_line_id",
             "tax_ids",
@@ -86,7 +88,7 @@ class VATReport(models.AbstractModel):
             vat_data.append(
                 {
                     "net": 0.0,
-                    "tax": tax_move_line["balance"],
+                    "tax": tax_move_line["debit"] - tax_move_line["credit"],
                     "tax_line_id": tax_move_line["tax_line_id"][0],
                 }
             )
@@ -94,7 +96,7 @@ class VATReport(models.AbstractModel):
             for tax_id in taxed_move_line["tax_ids"]:
                 vat_data.append(
                     {
-                        "net": taxed_move_line["balance"],
+                        "net": taxed_move_line["debit"] - taxed_move_line["credit"],
                         "tax": 0.0,
                         "tax_line_id": tax_id,
                     }
