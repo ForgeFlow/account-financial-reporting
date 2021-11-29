@@ -268,7 +268,8 @@ class GeneralLedgerReport(models.AbstractModel):
             )
             balance = pl_initial_balance["debit"] - pl_initial_balance["credit"]
             gen_ld_data[unaffected_id]["init_bal"]["debit"] += pl_initial_balance[
-                "debit"]
+                "debit"
+            ]
             gen_ld_data[unaffected_id]["init_bal"]["credit"] += pl_initial_balance[
                 "credit"
             ]
