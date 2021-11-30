@@ -37,13 +37,15 @@ class ActivityStatementXslx(models.AbstractModel):
             row_pos, 0, row_pos, 6, statement_header, self.format_right_bold
         )
         row_pos += 1
-        sheet.write(row_pos, 0, _("Reference Number"), self.format_theader_blue_center)
-        sheet.write(row_pos, 1, _("Date"), self.format_theader_blue_center)
-        sheet.merge_range(
-            row_pos, 2, row_pos, 4, _("Description"), self.format_theader_blue_center
+        sheet.write(
+            row_pos, 0, _("Reference Number"), self.format_theader_yellow_center
         )
-        sheet.write(row_pos, 5, _("Open Amount"), self.format_theader_blue_center)
-        sheet.write(row_pos, 6, _("Balance"), self.format_theader_blue_center)
+        sheet.write(row_pos, 1, _("Date"), self.format_theader_yellow_center)
+        sheet.merge_range(
+            row_pos, 2, row_pos, 4, _("Description"), self.format_theader_yellow_center
+        )
+        sheet.write(row_pos, 5, _("Open Amount"), self.format_theader_yellow_center)
+        sheet.write(row_pos, 6, _("Balance"), self.format_theader_yellow_center)
         row_pos += 1
         sheet.write(row_pos, 1, partner_data.get("start"), self.format_tcell_date_left)
         sheet.merge_range(
@@ -104,7 +106,7 @@ class ActivityStatementXslx(models.AbstractModel):
             row_pos += 1
             for i in range(len(buckets_labels)):
                 sheet.write(
-                    row_pos, i, buckets_labels[i], self.format_theader_blue_center
+                    row_pos, i, buckets_labels[i], self.format_theader_yellow_center
                 )
             row_pos += 1
             sheet.write(
@@ -148,9 +150,6 @@ class ActivityStatementXslx(models.AbstractModel):
             company = self.env.user.company_id
         data.update(report_model._get_report_values(data.get("partner_ids"), data))
         partners = self.env["res.partner"].browse(data.get("partner_ids"))
-        invoice_address = data.get("get_inv_addr", lambda x: self.env["res.partner"])(
-            partners
-        )
         sheet = workbook.add_worksheet(_("Activity Statement"))
         sheet.set_landscape()
         row_pos = 0
@@ -163,54 +162,50 @@ class ActivityStatementXslx(models.AbstractModel):
             self.format_ws_title,
         )
         row_pos += 1
-        sheet.write(row_pos, 0, _("Date:"), self.format_right_bold)
+        sheet.write(row_pos, 1, _("Date:"), self.format_theader_yellow_right)
         sheet.write(
             row_pos,
-            1,
+            2,
             fields.Date.from_string(data.get("date_end")),
             self.format_date_left,
         )
         self._size_columns(sheet)
         for partner in partners:
+            invoice_address = data.get(
+                "get_inv_addr", lambda x: self.env["res.partner"]
+            )(partner)
             row_pos += 1
-            sheet.set_row(row_pos, 80)
-            sheet.write(row_pos, 0, _("Statement to:"), self.format_right_bold)
+            sheet.write(
+                row_pos, 1, _("Statement to:"), self.format_theader_yellow_right
+            )
             sheet.merge_range(
-                row_pos,
-                1,
-                row_pos,
-                2,
-                invoice_address.contact_address,
-                self.format_distributed,
+                row_pos, 2, row_pos, 3, invoice_address.display_name, self.format_left,
             )
             if invoice_address.vat:
-                sheet.merge_range(
-                    row_pos,
-                    3,
-                    row_pos,
-                    4,
-                    _("VAT: %s") % (invoice_address.vat),
-                    self.format_left,
+                sheet.write(
+                    row_pos, 4, _("VAT:"), self.format_theader_yellow_right,
+                )
+                sheet.write(
+                    row_pos, 5, invoice_address.vat, self.format_left,
                 )
             row_pos += 1
-            sheet.set_row(row_pos, 80)
-            sheet.write(row_pos, 0, _("Statement from:"), self.format_right_bold)
+            sheet.write(
+                row_pos, 1, _("Statement from:"), self.format_theader_yellow_right
+            )
             sheet.merge_range(
                 row_pos,
-                1,
-                row_pos,
                 2,
-                company.partner_id.contact_address,
-                self.format_distributed,
+                row_pos,
+                3,
+                company.partner_id.display_name,
+                self.format_left,
             )
             if company.vat:
-                sheet.merge_range(
-                    row_pos,
-                    3,
-                    row_pos,
-                    4,
-                    _("VAT: %s") % (company.vat),
-                    self.format_left,
+                sheet.write(
+                    row_pos, 4, _("VAT:"), self.format_theader_yellow_right,
+                )
+                sheet.write(
+                    row_pos, 5, company.vat, self.format_left,
                 )
             partner_data = data.get("data", {}).get(partner.id)
             currencies = partner_data.get("currencies", {}).keys()
@@ -219,9 +214,13 @@ class ActivityStatementXslx(models.AbstractModel):
             for currency_id in currencies:
                 currency = self.env["res.currency"].browse(currency_id)
                 if currency.position == "after":
-                    money_string = "#,##0.00 " + "[${}]".format(currency.symbol)
+                    money_string = "#,##0.%s " % (
+                        "0" * currency.decimal_places
+                    ) + "[${}]".format(currency.symbol)
                 elif currency.position == "before":
-                    money_string = "[${}]".format(currency.symbol) + " #,##0.00"
+                    money_string = "[${}]".format(currency.symbol) + " #,##0.%s" % (
+                        "0" * currency.decimal_places
+                    )
                 self.current_money_format = workbook.add_format(
                     {"align": "right", "num_format": money_string}
                 )
