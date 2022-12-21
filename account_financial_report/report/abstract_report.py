@@ -27,6 +27,7 @@ class AbstractReport(models.AbstractModel):
         domain = [
             ("account_id", "in", account_ids),
             ("company_id", "=", company_id),
+            ("full_reconcile_id", "=", False),
             ("amount_residual", "!=", 0.0),
         ]
         if partner_ids:
