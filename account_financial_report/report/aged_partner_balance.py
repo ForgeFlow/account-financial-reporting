@@ -154,7 +154,9 @@ class AgedPartnerBalanceReport(models.AbstractModel):
         )
         ml_fields = self._get_ml_fields()
         line_model = self.env["account.move.line"]
-        move_lines = line_model.search_read(domain=domain, fields=ml_fields)
+        move_lines = line_model.search_read(
+            domain=domain, fields=ml_fields, order="partner_id asc"
+        )
         journals_ids = set()
         partners_ids = set()
         partners_data = {}

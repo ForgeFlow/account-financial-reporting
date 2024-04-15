@@ -83,7 +83,8 @@ class AgedPartnerBalanceReport(models.AbstractModel):
         company_currency = self.env["res.company"].browse(company_id).currency_id
         ml_fields = self._get_ml_fields()
         new_move_lines = self.env["account.move.line"].search_read(
-            domain=new_domain, fields=ml_fields
+            domain=new_domain,
+            fields=ml_fields,
         )
         move_lines = move_lines + new_move_lines
         for move_line in move_lines:

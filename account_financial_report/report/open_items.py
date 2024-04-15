@@ -74,7 +74,7 @@ class OpenItemsReport(models.AbstractModel):
         )
         ml_fields = self._get_ml_fields()
         move_lines = self.env["account.move.line"].search_read(
-            domain=domain, fields=ml_fields
+            domain=domain, fields=ml_fields, order="partner_id asc"
         )
         journals_ids = set()
         group_ids = set()
