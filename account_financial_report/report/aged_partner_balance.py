@@ -97,32 +97,34 @@ class AgedPartnerBalanceReport(models.AbstractModel):
         return ag_pb_data
 
     def _get_account_partial_reconciled(self, company_id, date_at_object):
-        domain = [('max_date', '>', date_at_object),
-                  ('company_id', '=', company_id)]
-        fields = ['debit_move_id', 'credit_move_id', 'amount']
-        accounts_partial_reconcile = \
-            self.env['account.partial.reconcile'].search_read(
-                domain=domain,
-                fields=fields
-            )
+        self.env.cr.execute("""
+            SELECT debit_move_id, credit_move_id, amount
+            FROM account_partial_reconcile
+            WHERE max_date > %s AND company_id = %s
+        """, (date_at_object, company_id))
+
+        accounts_partial_reconcile = self.env.cr.fetchall()
         debit_amount = {}
         credit_amount = {}
+        reconciled_data = []
         for account_partial_reconcile_data in accounts_partial_reconcile:
-            debit_move_id = account_partial_reconcile_data['debit_move_id'][0]
-            credit_move_id = account_partial_reconcile_data['credit_move_id'][0]
+            debit_move_id = account_partial_reconcile_data[0]
+            credit_move_id = account_partial_reconcile_data[1]
+            amount = account_partial_reconcile_data[2]
             if debit_move_id not in debit_amount.keys():
                 debit_amount[debit_move_id] = 0.0
             debit_amount[debit_move_id] += \
-                account_partial_reconcile_data['amount']
+                amount
             if credit_move_id not in credit_amount.keys():
                 credit_amount[credit_move_id] = 0.0
             credit_amount[credit_move_id] += \
-                account_partial_reconcile_data['amount']
-            account_partial_reconcile_data.update({
+                amount
+            reconciled_data.append({
                 'debit_move_id': debit_move_id,
                 'credit_move_id': credit_move_id,
+                'amount': amount
             })
-        return accounts_partial_reconcile, debit_amount, credit_amount
+        return reconciled_data, debit_amount, credit_amount
 
     @api.model
     def _get_new_move_lines_domain(self, new_ml_ids, account_ids, company_id,
@@ -155,10 +157,17 @@ class AgedPartnerBalanceReport(models.AbstractModel):
             'id', 'name', 'date', 'move_id', 'journal_id', 'account_id',
             'partner_id', 'amount_residual', 'date_maturity', 'ref',
             'reconciled']
-        new_move_lines = self.env['account.move.line'].search_read(
-            domain=new_domain, fields=ml_fields
-        )
-        move_lines = move_lines + new_move_lines
+        batch_size = 1000
+        offset = 0
+        while True:
+            new_move_lines = self.env['account.move.line'].search_read(
+                domain=new_domain, fields=ml_fields, limit=batch_size, offset=offset
+            )
+            if not new_move_lines:
+                break
+            move_lines = move_lines + new_move_lines
+            offset += batch_size
+
         for move_line in move_lines:
             ml_id = move_line['id']
             if ml_id in debit_ids:
