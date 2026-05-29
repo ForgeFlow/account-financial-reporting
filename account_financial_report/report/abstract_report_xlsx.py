@@ -252,7 +252,7 @@ class AbstractReportXslx(models.AbstractModel):
                         and not isinstance(value, bool)
                         and not isinstance(value, int)
                     ):
-                        value = value and value.strftime("%d/%m/%Y")
+                        value = value and value.strftime(self._get_lang_date_format())
                     report_data["sheet"].write_string(
                         report_data["row_pos"], col_pos, value or ""
                     )
@@ -601,6 +601,10 @@ class AbstractReportXslx(models.AbstractModel):
                 format_amount = "#,##0." + ("0" * currency.decimal_places)
                 format_amt.set_num_format(format_amount)
         return format_amt
+
+    def _get_lang_date_format(self):
+        lang = self.env["res.lang"]._lang_get(self.env.lang or "en_US")
+        return lang.date_format if lang else "%m/%d/%Y"
 
     def _generate_report_content(self, workbook, report, data, report_data):
         """

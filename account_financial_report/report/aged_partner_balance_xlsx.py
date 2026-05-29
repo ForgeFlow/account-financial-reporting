@@ -208,7 +208,10 @@ class AgedPartnerBalanceXslx(models.AbstractModel):
 
     def _get_report_filters(self, report):
         return [
-            [_("Date at filter"), report.date_at.strftime("%d/%m/%Y")],
+            [
+                _("Date at filter"),
+                report.date_at.strftime(self._get_lang_date_format()),
+            ],
             [
                 _("Target moves filter"),
                 _("All posted entries")
