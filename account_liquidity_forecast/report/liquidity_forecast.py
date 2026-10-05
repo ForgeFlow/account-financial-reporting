@@ -155,9 +155,9 @@ class LiquidityForecastReport(models.AbstractModel):
         for open_aml in period_open_amls:
             account = open_aml.account_id
             open_item_amount = open_aml.amount_residual
-            if open_item_amount > 0 and account not in in_flows.keys():
+            if open_item_amount > 0 and account not in in_flows:
                 in_flows[account] = {"amount": 0.0, "move_line_ids": []}
-            if open_item_amount < 0 and account not in out_flows.keys():
+            if open_item_amount < 0 and account not in out_flows:
                 out_flows[account] = {"amount": 0.0, "move_line_ids": []}
             if open_item_amount > 0:
                 in_flows[account]["amount"] += open_item_amount
@@ -165,7 +165,7 @@ class LiquidityForecastReport(models.AbstractModel):
             else:
                 out_flows[account]["amount"] += open_item_amount
                 out_flows[account]["move_line_ids"].append(open_aml.id)
-        for account in in_flows.keys():
+        for account in in_flows:
             in_cash_flow_lines = list(
                 filter(
                     lambda d: f"cash_flow_line_in_account_{account.code}" in d["code"],
@@ -196,7 +196,7 @@ class LiquidityForecastReport(models.AbstractModel):
             in_cash_flow_line["periods"][period["sequence"]]["domain"] = [
                 ("id", "in", in_flows[account]["move_line_ids"])
             ]
-        for account in out_flows.keys():
+        for account in out_flows:
             out_cash_flow_lines = list(
                 filter(
                     lambda d: f"cash_flow_line_out_account_{account.code}" in d["code"],
