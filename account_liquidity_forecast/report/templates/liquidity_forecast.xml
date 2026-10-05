@@ -20,7 +20,7 @@
             <t t-out="currency_name" />
         </t>
         <t t-set="company_name" t-value="Company_Name" />
-        <t class="page">
+        <t>
             <div class="row">
                 <h4
                     class="mt0"

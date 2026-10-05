@@ -60,16 +60,12 @@ class LiquidityForecastReport(models.AbstractModel):
             else:
                 domain += [("move_id.state", "in", ["posted", "draft"])]
 
-            initial_balances = self.env["account.move.line"].read_group(
-                domain=domain,
-                fields=["balance:sum"],
-                groupby=["company_id"],
+            [(initial_balance_amount,)] = self.env["account.move.line"]._read_group(
+                domain, aggregates=["balance:sum"]
             )
-            initial_balance_amount = 0.0
-            if initial_balances:
-                initial_balance = initial_balances[0]
-                initial_balance_amount = initial_balance["balance"]
-            line["periods"][period["sequence"]]["amount"] = initial_balance_amount
+            line["periods"][period["sequence"]]["amount"] = (
+                initial_balance_amount or 0.0
+            )
         else:
             ending_balance_line = list(
                 filter(
@@ -81,12 +77,12 @@ class LiquidityForecastReport(models.AbstractModel):
             ][period["sequence"] - 1]["amount"]
 
     def _complete_ending_balance(self, data, liquidity_forecast_lines, line, period):
-        starting_balance_line = list(
-            filter(lambda d: d["code"] == "beginning_balance", liquidity_forecast_lines)
-        )[0]
-        net_cash_flow_line = list(
-            filter(lambda d: d["code"] == "net_cash_flow", liquidity_forecast_lines)
-        )[0]
+        starting_balance_line = next(
+            d for d in liquidity_forecast_lines if d["code"] == "beginning_balance"
+        )
+        net_cash_flow_line = next(
+            d for d in liquidity_forecast_lines if d["code"] == "net_cash_flow"
+        )
         line["periods"][period["sequence"]]["amount"] = (
             starting_balance_line["periods"][period["sequence"]]["amount"]
             + net_cash_flow_line["periods"][period["sequence"]]["amount"]
@@ -278,20 +274,11 @@ class LiquidityForecastReport(models.AbstractModel):
         ]
         if period["sequence"] > 0:
             domain += [("date", ">=", period["date_from"])]
-        totals = self.env["account.liquidity.forecast.planning.item"].read_group(
-            domain=domain,
-            fields=["amount:sum"],
-            groupby=["group_id"],
+        totals = self.env["account.liquidity.forecast.planning.item"]._read_group(
+            domain, groupby=["group_id"], aggregates=["amount:sum"]
         )
-        for total in totals:
-            group_id = total["group_id"] and total["group_id"][0] or False
-            group_name = ""
-            group = self.env["account.liquidity.forecast.planning.group"]
-            if group_id:
-                group = self.env["account.liquidity.forecast.planning.group"].browse(
-                    group_id
-                )
-                group_name = group and group.name or ""
+        for group, amount in totals:
+            group_name = group.name or ""
             title = group_name or self.env._("Forecast Planning Items")
             code = f"cash_flow_line_{direction}_planned_item"
             if group:
@@ -324,10 +311,10 @@ class LiquidityForecastReport(models.AbstractModel):
             else:
                 cash_flow_line = cash_flow_lines[0]
             sign = direction == "in" and 1 or -1
-            cash_flow_line["periods"][period["sequence"]]["amount"] += (
-                total["amount"] * sign
-            )
-            cash_flow_line["periods"][period["sequence"]]["domain"] = total["__domain"]
+            cash_flow_line["periods"][period["sequence"]]["amount"] += amount * sign
+            cash_flow_line["periods"][period["sequence"]]["domain"] = domain + [
+                ("group_id", "=", group.id)
+            ]
 
     def _prepare_cash_flow_lines_payment_planning_item_in(
         self, data, liquidity_forecast_lines, period, periods
@@ -344,8 +331,8 @@ class LiquidityForecastReport(models.AbstractModel):
         )
 
     def _generate_periods(self, data):
-        date_from = fields.Date.from_string(data["date_from"])
-        date_to = fields.Date.from_string(data["date_to"])
+        date_from = fields.Date.to_date(data["date_from"])
+        date_to = fields.Date.to_date(data["date_to"])
         period_length = data["period_length"]
         periods = []
         current_date = date_from
@@ -386,7 +373,7 @@ class LiquidityForecastReport(models.AbstractModel):
                 name = format_date(self.env, current_date, date_format="MMMM yyyy")
 
             if sequence == 0:
-                name = self.env._("Current %s") % name
+                name = self.env._("Current %s", name)
 
             period = {
                 "sequence": sequence,
@@ -508,7 +495,7 @@ class LiquidityForecastReport(models.AbstractModel):
 
         return {
             "doc_ ids": [wizard_id],
-            "doc_model": "liquidity.forecast.report.wizard",
+            "doc_model": "account.liquidity.forecast.report.wizard",
             "docs": self.env["account.liquidity.forecast.report.wizard"].browse(
                 wizard_id
             ),

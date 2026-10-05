@@ -1,6 +1,4 @@
-/** @odoo-module */
-
-import {useComponent, useEffect} from "@odoo/owl";
+import {useComponent, useLayoutEffect} from "@web/owl2/utils";
 
 // Utility function to convert string to title case
 function toTitleCase(str) {
@@ -13,7 +11,12 @@ function toTitleCase(str) {
 }
 
 // Function to enrich DOM elements with action links
-function enrich(component, targetElement, selector, isIFrame = false) {
+export function enrichWithActionLinks(
+    component,
+    targetElement,
+    selector,
+    isIFrame = false
+) {
     let doc = window.document;
     let contentDocument = targetElement;
 
@@ -56,14 +59,14 @@ function enrich(component, targetElement, selector, isIFrame = false) {
 // Hook to enrich elements with action links
 export function useEnrichWithActionLinks(ref, selector = null) {
     const comp = useComponent();
-    useEffect(
+    useLayoutEffect(
         (element) => {
             if (element.matches("iframe")) {
                 element.addEventListener("load", () =>
-                    enrich(comp, element, selector, true)
+                    enrichWithActionLinks(comp, element, selector, true)
                 );
             } else {
-                enrich(comp, element, selector);
+                enrichWithActionLinks(comp, element, selector);
             }
         },
         () => [ref.el]

@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import xlsxwriter
 
-from odoo import Command
+from odoo import Command, fields
 
 from odoo.addons.account_liquidity_forecast.report.liquidity_forecast_xlsx import (
     copy_format,
@@ -13,12 +13,14 @@ from odoo.addons.base.tests.common import BaseCommon
 
 
 class TestLiquidityForecastReport(BaseCommon):
+    _test_user_groups = ("account.group_account_manager", "account.group_account_user")
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.report = cls.env["report.account_liquidity_forecast.liquidity_forecast"]
         cls.company = cls.env.user.company_id
-        cls.today = date.today()
+        cls.today = fields.Date.today()
 
         cls.base_data = {
             "company_id": cls.company.id,
