@@ -18,6 +18,11 @@ class TestResConfigSettings(TransactionCase):
             )
         )
         cls.config = cls.env["res.config.settings"]
+        # Running statements needs accounting read access (Odoo 20: the
+        # Administrator group of Invoicing does not imply it).
+        cls.env.ref("base.user_admin").group_ids = [
+            (4, cls.env.ref("account.group_account_user").id)
+        ]
         user = cls.env["res.users"].create(
             {
                 "name": "Account Test User",

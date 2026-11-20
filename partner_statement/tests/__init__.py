@@ -7,3 +7,4 @@ from . import test_activity_statement_xlsx
 from . import test_outstanding_statement_xlsx
 from . import test_detailed_activity_statement_xlsx
 from . import test_detailed_activity_statement_wizard
+from . import test_wizard_restrictions

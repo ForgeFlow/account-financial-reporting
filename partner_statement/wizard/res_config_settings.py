@@ -6,7 +6,7 @@ class ResConfigSettings(models.TransientModel):
 
     group_activity_statement = fields.Boolean(
         "Enable OCA Activity & Detailed Activity Statements",
-        group="account.group_account_invoice",
+        group="account.group_account_readonly",
         implied_group="partner_statement.group_activity_statement",
     )
 
@@ -33,7 +33,7 @@ class ResConfigSettings(models.TransientModel):
 
     group_outstanding_statement = fields.Boolean(
         "Enable OCA Outstanding Statements",
-        group="account.group_account_invoice",
+        group="account.group_account_readonly",
         implied_group="partner_statement.group_outstanding_statement",
     )
 

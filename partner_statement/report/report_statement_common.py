@@ -4,6 +4,7 @@
 from datetime import timedelta
 
 from odoo import api, fields, models
+from odoo.exceptions import AccessError
 from odoo.tools.misc import DEFAULT_SERVER_DATE_FORMAT
 
 
@@ -357,6 +358,16 @@ class ReportStatementCommon(models.AbstractModel):
         }
         """
         company_id = data["company_id"]
+        # The report reads journal items with raw SQL, so record rules do
+        # not apply: refuse companies the user cannot access and users
+        # without accounting read access (e.g. a direct /report URL).
+        if not self.env.su and (
+            company_id not in self.env.companies.ids
+            or not self.env.user.has_group("account.group_account_readonly")
+        ):
+            raise AccessError(
+                self.env._("You are not allowed to read this partner statement.")
+            )
         partner_ids = data["partner_ids"]
         date_start = data.get("date_start")
         if date_start and isinstance(date_start, str):
